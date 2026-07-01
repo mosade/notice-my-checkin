@@ -1,0 +1,33 @@
+{
+  "autoStartChecking": true,
+  "hideToTrayOnClose": true,
+  "browser": {
+    "executablePath": "",
+    "headless": true,
+    "userDataDir": "browser-profile"
+  },
+  "detection": {
+    "mode": "mock",
+    "loginUrl": "",
+    "apiUrl": "",
+    "mockCheckedIn": false
+  },
+  "reminderWindows": [
+    {
+      "id": "morning",
+      "name": "上午打卡",
+      "enabled": true,
+      "startTime": "08:00",
+      "endTime": "09:00",
+      "remindIntervalMinutes": 15
+    },
+    {
+      "id": "evening",
+      "name": "下午打卡",
+      "enabled": true,
+      "startTime": "17:30",
+      "endTime": "18:30",
+      "remindIntervalMinutes": 15
+    }
+  ]
+}
