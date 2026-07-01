@@ -24,7 +24,8 @@ body {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -49,7 +50,8 @@ button.ghost {
   color: #26313d;
 }
 
-input {
+input,
+select {
   width: 100%;
   min-height: 36px;
   border: 1px solid #c3cad2;

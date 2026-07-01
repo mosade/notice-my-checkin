@@ -10,7 +10,9 @@
     "mode": "mock",
     "loginUrl": "",
     "apiUrl": "",
-    "mockCheckedIn": false
+    "mockCheckedIn": false,
+    "checkedInKeyword": "",
+    "loginTimeoutSeconds": 30
   },
   "reminderWindows": [
     {

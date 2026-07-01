@@ -31,6 +31,10 @@ pub struct DetectionConfig {
     pub login_url: String,
     pub api_url: String,
     pub mock_checked_in: bool,
+    #[serde(default)]
+    pub checked_in_keyword: String,
+    #[serde(default = "default_login_timeout_seconds")]
+    pub login_timeout_seconds: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -58,6 +62,8 @@ pub fn default_config() -> AppConfig {
             login_url: String::new(),
             api_url: String::new(),
             mock_checked_in: false,
+            checked_in_keyword: String::new(),
+            login_timeout_seconds: default_login_timeout_seconds(),
         },
         reminder_windows: vec![
             ReminderWindow {
@@ -78,6 +84,10 @@ pub fn default_config() -> AppConfig {
             },
         ],
     }
+}
+
+fn default_login_timeout_seconds() -> u64 {
+    30
 }
 
 pub fn read_or_create_config(path: &Path) -> io::Result<AppConfig> {

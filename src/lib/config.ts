@@ -6,7 +6,15 @@ export function validateConfig(config: AppConfig): string[] {
     validateReminderWindow(window).map((error) => `${window.name || window.id}: ${error}`),
   );
   if (config.detection.mode !== "mock") {
-    errors.push("第一版仅支持 mock 检测模式");
+    if (!config.detection.loginUrl.trim()) errors.push("Chrome HTTP 模式需要登录链接");
+    if (!config.detection.apiUrl.trim()) errors.push("Chrome HTTP 模式需要检测接口");
+    if (!config.detection.checkedInKeyword.trim()) errors.push("Chrome HTTP 模式需要已打卡判断关键词");
+    if (
+      !Number.isFinite(config.detection.loginTimeoutSeconds) ||
+      config.detection.loginTimeoutSeconds < 1
+    ) {
+      errors.push("自动登录超时时间至少 1 秒");
+    }
   }
   return errors;
 }

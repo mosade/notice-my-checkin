@@ -13,10 +13,12 @@ export type BrowserConfig = {
 };
 
 export type DetectionConfig = {
-  mode: "mock";
+  mode: "mock" | "chrome_http";
   loginUrl: string;
   apiUrl: string;
   mockCheckedIn: boolean;
+  checkedInKeyword: string;
+  loginTimeoutSeconds: number;
 };
 
 export type ReminderWindow = {
