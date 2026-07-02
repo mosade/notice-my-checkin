@@ -11,14 +11,14 @@ export function validateReminderWindow(window: ReminderWindow): string[] {
   const errors: string[] = [];
   const start = minutesFromTime(window.startTime);
   const end = minutesFromTime(window.endTime);
-  if (!window.name.trim()) errors.push("名称不能为空");
-  if (start === null) errors.push("开始时间格式无效");
-  if (end === null) errors.push("结束时间格式无效");
+  if (!window.name.trim()) errors.push("Name is required");
+  if (start === null) errors.push("Start time format is invalid");
+  if (end === null) errors.push("End time format is invalid");
   if (start !== null && end !== null && start >= end) {
-    errors.push("开始时间必须早于结束时间");
+    errors.push("Start time must be earlier than end time");
   }
   if (!Number.isFinite(window.remindIntervalMinutes) || window.remindIntervalMinutes < 1) {
-    errors.push("提醒间隔至少 1 分钟");
+    errors.push("Reminder interval must be at least 1 minute");
   }
   return errors;
 }

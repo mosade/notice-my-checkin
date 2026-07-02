@@ -1,4 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  BellOutlined,
+  CheckCircleOutlined,
+  ClockCircleOutlined,
+  PauseCircleOutlined,
+  PlayCircleOutlined,
+  SaveOutlined,
+  SyncOutlined,
+} from "@ant-design/icons";
+import { Alert, Button, Card, Layout, Space, Spin, Switch, Typography } from "antd";
 import "./App.css";
 import { BrowserSettings } from "./components/BrowserSettings";
 import { DetectionSettings } from "./components/DetectionSettings";
@@ -7,6 +17,9 @@ import { RuntimeStatusPanel } from "./components/RuntimeStatusPanel";
 import { validateConfig } from "./lib/config";
 import { checkinApi } from "./lib/electron";
 import type { AppConfig, AppRuntimeSnapshot, CheckResult, ReminderAction } from "./lib/types";
+
+const { Content } = Layout;
+const { Text, Title } = Typography;
 
 function App() {
   const isReminder = window.location.hash === "#/reminder";
@@ -35,7 +48,7 @@ function MainView() {
   const checkNow = useCallback(async () => {
     await checkinApi.runCheckNow();
     await refreshSnapshot();
-    setMessage("已完成立即检测");
+    setMessage("Manual check completed.");
   }, [refreshSnapshot]);
 
   useEffect(() => {
@@ -60,14 +73,18 @@ function MainView() {
   }, [checkNow, pause, refreshSnapshot, snapshot?.checking, start]);
 
   if (!config) {
-    return <main className="app-shell loading">{message || "加载中"}</main>;
+    return (
+      <Layout className="app-shell loading">
+        <Spin tip={message || "Loading"} />
+      </Layout>
+    );
   }
 
   const save = async () => {
     if (validationErrors.length > 0) return;
     const saved = await checkinApi.saveConfig(config);
     setConfig(saved);
-    setMessage("配置已保存");
+    setMessage("Configuration saved.");
   };
 
   const testBrowser = async () => {
@@ -78,59 +95,67 @@ function MainView() {
   };
 
   return (
-    <main className="app-shell">
-      <header className="topbar">
+    <Layout className="app-shell">
+      <Content>
+        <header className="topbar">
         <div>
-          <h1>打卡提醒</h1>
-          <p>{snapshot?.checking ? "后台检测运行中" : "后台检测已暂停"}</p>
+          <Title level={2}>Check-in Reminder</Title>
+          <Text type="secondary">{snapshot?.checking ? "Background checks are running." : "Background checks are paused."}</Text>
         </div>
-        <div className="toolbar">
-          <button type="button" onClick={snapshot?.checking ? pause : start}>
-            {snapshot?.checking ? "暂停检测" : "开始检测"}
-          </button>
-          <button type="button" onClick={checkNow}>
-            立即检测
-          </button>
-          <button type="button" onClick={() => checkinApi.testReminder()}>
-            测试提醒
-          </button>
-          <button type="button" disabled={validationErrors.length > 0} onClick={save}>
-            保存配置
-          </button>
-        </div>
+        <Space wrap className="toolbar">
+          <Button
+            icon={snapshot?.checking ? <PauseCircleOutlined /> : <PlayCircleOutlined />}
+            onClick={snapshot?.checking ? pause : start}
+          >
+            {snapshot?.checking ? "Pause Checks" : "Start Checks"}
+          </Button>
+          <Button icon={<SyncOutlined />} onClick={checkNow}>
+            Check Now
+          </Button>
+          <Button icon={<BellOutlined />} onClick={() => checkinApi.testReminder()}>
+            Test Reminder
+          </Button>
+          <Button type="primary" icon={<SaveOutlined />} disabled={validationErrors.length > 0} onClick={save}>
+            Save Settings
+          </Button>
+        </Space>
       </header>
 
-      {message ? <p className="result ok">{message}</p> : null}
-      {validationErrors.length > 0 ? <p className="result bad">{validationErrors.join("；")}</p> : null}
+      <Space direction="vertical" size={16} className="page-stack">
+        {message ? <Alert type="success" showIcon message={message} /> : null}
+        {validationErrors.length > 0 ? <Alert type="error" showIcon message={validationErrors.join("; ")} /> : null}
 
-      <section className="settings-grid">
-        <section className="panel">
-          <div className="section-title">
-            <h2>应用</h2>
-          </div>
-          <label className="switch-row">
-            <input
-              type="checkbox"
-              checked={config.autoStartChecking}
-              onChange={(event) => setConfig({ ...config, autoStartChecking: event.currentTarget.checked })}
-            />
-            启动后自动检测
-          </label>
-          <label className="switch-row">
-            <input
-              type="checkbox"
-              checked={config.hideToTrayOnClose}
-              onChange={(event) => setConfig({ ...config, hideToTrayOnClose: event.currentTarget.checked })}
-            />
-            关闭主窗口隐藏到托盘
-          </label>
+        <section className="settings-grid">
+          <Card title="Application" className="settings-card">
+            <Space direction="vertical" size={16}>
+              <Space align="center">
+                <Switch
+                  checked={config.autoStartChecking}
+                  checkedChildren="On"
+                  unCheckedChildren="Off"
+                  onChange={(checked) => setConfig({ ...config, autoStartChecking: checked })}
+                />
+                <Text>Start checking automatically after launch</Text>
+              </Space>
+              <Space align="center">
+                <Switch
+                  checked={config.hideToTrayOnClose}
+                  checkedChildren="On"
+                  unCheckedChildren="Off"
+                  onChange={(checked) => setConfig({ ...config, hideToTrayOnClose: checked })}
+                />
+                <Text>Hide the main window to the tray on close</Text>
+              </Space>
+            </Space>
+          </Card>
+          <BrowserSettings config={config} browserTest={browserTest} onChange={setConfig} onTest={testBrowser} />
+          <DetectionSettings config={config} onChange={setConfig} />
         </section>
-        <BrowserSettings config={config} browserTest={browserTest} onChange={setConfig} onTest={testBrowser} />
-        <DetectionSettings config={config} onChange={setConfig} />
         <ReminderWindowEditor config={config} onChange={setConfig} />
         <RuntimeStatusPanel snapshot={snapshot} />
-      </section>
-    </main>
+      </Space>
+      </Content>
+    </Layout>
   );
 }
 
@@ -158,29 +183,42 @@ function ReminderView() {
     setBusy(true);
     const snapshot = await checkinApi.confirmCheckedIn(action.windowId);
     const current = snapshot.states.find((state) => state.reminderWindowId === action.windowId);
-    setMessage(current?.status === "checked_in" ? "已确认打卡" : "暂未检测到打卡记录");
+    setMessage(current?.status === "checked_in" ? "Check-in confirmed." : "No check-in record found yet.");
     setBusy(false);
   };
 
   return (
-    <main className="reminder-shell">
-      <h1>{action?.error ? "检测失败" : "还没有检测到打卡记录"}</h1>
-      <p className="reminder-window-name">
-        {action ? `${action.windowName} ${action.timeRange}` : "等待提醒数据"}
-      </p>
-      <p className={action?.error ? "result bad" : "muted"}>
-        {action?.error ? `检测失败：${action.error}` : `最近检测：${action?.lastCheckedAt ?? "-"}`}
-      </p>
-      {message ? <p className="result warn">{message}</p> : null}
-      <div className="reminder-actions">
-        <button type="button" disabled={!action || busy} onClick={confirm}>
-          我已打卡
-        </button>
-        <button type="button" disabled={!action || busy} className="ghost" onClick={snooze}>
-          稍后提醒
-        </button>
-      </div>
-    </main>
+    <Layout className="reminder-shell">
+      <Card size="small" className="reminder-card">
+        <Space direction="vertical" size={8}>
+          <Title level={4}>{action?.error ? "Check Failed" : "No Check-in Record Found"}</Title>
+          <Text className="reminder-window-name">
+            {action ? `${action.windowName} ${action.timeRange}` : "Waiting for reminder data"}
+          </Text>
+          <Alert
+            type={action?.error ? "error" : "info"}
+            showIcon
+            message={action?.error ? `Check failed: ${action.error}` : `Last checked: ${action?.lastCheckedAt ?? "-"}`}
+          />
+          {message ? <Alert type="warning" showIcon message={message} /> : null}
+          <Space wrap>
+            <Button
+              size="small"
+              type="primary"
+              icon={<CheckCircleOutlined />}
+              disabled={!action || busy}
+              loading={busy}
+              onClick={confirm}
+            >
+              I Have Checked In
+            </Button>
+            <Button size="small" icon={<ClockCircleOutlined />} disabled={!action || busy} onClick={snooze}>
+              Remind Me Later
+            </Button>
+          </Space>
+        </Space>
+      </Card>
+    </Layout>
   );
 }
 

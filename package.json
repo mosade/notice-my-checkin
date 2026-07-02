@@ -15,7 +15,9 @@
     "postinstall": "cross-env PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ install-electron --no"
   },
   "dependencies": {
+    "@ant-design/icons": "^6.3.2",
     "@types/node": "^26.1.0",
+    "antd": "^6.5.0",
     "concurrently": "^10.0.3",
     "cross-env": "^10.1.0",
     "electron": "^43.0.0",

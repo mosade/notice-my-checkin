@@ -1,3 +1,4 @@
+import { Card, Table, Tag } from "antd";
 import type { AppRuntimeSnapshot, RuntimeWindowState } from "../lib/types";
 
 type Props = {
@@ -5,50 +6,52 @@ type Props = {
 };
 
 const statusText: Record<RuntimeWindowState["status"], string> = {
-  idle: "空闲",
-  checking: "检测中",
-  not_checked_in: "未打卡",
-  reminding: "提醒中",
-  checked_in: "已打卡",
-  expired: "已过期",
-  error: "异常",
+  idle: "Idle",
+  checking: "Checking",
+  not_checked_in: "Not Checked In",
+  reminding: "Reminding",
+  checked_in: "Checked In",
+  expired: "Expired",
+  error: "Error",
+};
+
+const statusColor: Record<RuntimeWindowState["status"], string> = {
+  idle: "default",
+  checking: "processing",
+  not_checked_in: "warning",
+  reminding: "warning",
+  checked_in: "success",
+  expired: "error",
+  error: "error",
 };
 
 export function RuntimeStatusPanel({ snapshot }: Props) {
   return (
-    <section className="panel wide-panel">
-      <div className="section-title">
-        <h2>运行状态</h2>
-        <span className={snapshot?.checking ? "badge live" : "badge"}>{snapshot?.checking ? "检测中" : "已暂停"}</span>
-      </div>
-      <div className="status-table">
-        <div className="status-head">时间段</div>
-        <div className="status-head">日期</div>
-        <div className="status-head">状态</div>
-        <div className="status-head">最近检测</div>
-        <div className="status-head">下次提醒</div>
-        {(snapshot?.states.length ?? 0) === 0 ? (
-          <p className="empty-state">暂无运行记录</p>
-        ) : (
-          snapshot?.states.map((state) => (
-            <StatusRow key={state.reminderWindowId} state={state} />
-          ))
-        )}
-      </div>
-    </section>
-  );
-}
-
-function StatusRow({ state }: { state: RuntimeWindowState }) {
-  return (
-    <>
-      <div>{state.reminderWindowId}</div>
-      <div>{state.date}</div>
-      <div>
-        <span className={`status-pill ${state.status}`}>{statusText[state.status]}</span>
-      </div>
-      <div>{state.lastCheckedAt ?? "-"}</div>
-      <div>{state.nextReminderAt ?? state.lastError ?? "-"}</div>
-    </>
+    <Card
+      title="Runtime Status"
+      extra={<Tag color={snapshot?.checking ? "success" : "default"}>{snapshot?.checking ? "Checking" : "Paused"}</Tag>}
+    >
+      <Table
+        rowKey="reminderWindowId"
+        dataSource={snapshot?.states ?? []}
+        pagination={false}
+        scroll={{ x: 760 }}
+        locale={{ emptyText: "No runtime records" }}
+        columns={[
+          { title: "Window", dataIndex: "reminderWindowId" },
+          { title: "Date", dataIndex: "date" },
+          {
+            title: "Status",
+            dataIndex: "status",
+            render: (status: RuntimeWindowState["status"]) => <Tag color={statusColor[status]}>{statusText[status]}</Tag>,
+          },
+          { title: "Last Checked", dataIndex: "lastCheckedAt", render: (value?: string) => value ?? "-" },
+          {
+            title: "Next Reminder",
+            render: (_: unknown, state: RuntimeWindowState) => state.nextReminderAt ?? state.lastError ?? "-",
+          },
+        ]}
+      />
+    </Card>
   );
 }

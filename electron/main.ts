@@ -155,7 +155,7 @@ async function runCheckNow(): Promise<ReminderAction[]> {
 
 function testReminder(): void {
   const window = scheduler.getConfig().reminderWindows.find((item) => item.enabled);
-  if (!window) throw new Error("没有启用的提醒时间段");
+  if (!window) throw new Error("No enabled reminder window");
   const action: ReminderAction = {
     windowId: window.id,
     windowName: window.name,
@@ -174,7 +174,7 @@ function testBrowser() {
       ok: false,
       checkedIn: false,
       checkedAt: new Date().toISOString(),
-      error: { code: "BROWSER_NOT_FOUND", message: "浏览器路径不存在或不可读取" },
+      error: { code: "BROWSER_NOT_FOUND", message: "Browser path does not exist or is not readable" },
     };
   }
   if (browser.userDataDir.trim()) mkdirSync(browser.userDataDir, { recursive: true });

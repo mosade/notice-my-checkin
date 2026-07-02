@@ -1,6 +1,10 @@
+import { DeleteOutlined, PlusOutlined } from "@ant-design/icons";
+import { Alert, Button, Card, Empty, Form, Input, InputNumber, Space, Switch, Typography } from "antd";
 import { createReminderWindow, overlapText } from "../lib/config";
 import { validateReminderWindow } from "../lib/time";
 import type { AppConfig, ReminderWindow } from "../lib/types";
+
+const { Text } = Typography;
 
 type Props = {
   config: AppConfig;
@@ -27,11 +31,12 @@ export function ReminderWindowEditor({ config, onChange }: Props) {
   const warning = overlapText(config);
 
   return (
-    <section className="panel wide-panel">
-      <div className="section-title">
-        <h2>提醒时间段</h2>
-        <button
-          type="button"
+    <Card
+      title="Reminder Windows"
+      extra={
+        <Button
+          type="primary"
+          icon={<PlusOutlined />}
           onClick={() =>
             onChange({
               ...config,
@@ -39,66 +44,78 @@ export function ReminderWindowEditor({ config, onChange }: Props) {
             })
           }
         >
-          新增
-        </button>
-      </div>
-      {warning ? <p className="result warn">{warning}</p> : null}
+          Add Window
+        </Button>
+      }
+    >
+      {warning ? <Alert type="warning" showIcon message={warning} className="section-alert" /> : null}
       <div className="window-list">
+        {config.reminderWindows.length === 0 ? <Empty description="No reminder windows" /> : null}
         {config.reminderWindows.map((window) => {
           const errors = validateReminderWindow(window);
           return (
-            <div className="window-row" key={window.id}>
-              <label className="compact-check">
-                <input
-                  type="checkbox"
+            <div className="window-row-card" key={window.id}>
+              <Form layout="vertical" className="window-row">
+                <Form.Item label="Enabled">
+                  <Switch
                   checked={window.enabled}
-                  onChange={(event) => updateWindow(window.id, { enabled: event.currentTarget.checked })}
+                    checkedChildren="On"
+                    unCheckedChildren="Off"
+                    onChange={(enabled) => updateWindow(window.id, { enabled })}
                 />
-              </label>
-              <label>
-                名称
-                <input
+                </Form.Item>
+                <Form.Item label="Name">
+                  <Input
                   value={window.name}
                   onChange={(event) => updateWindow(window.id, { name: event.currentTarget.value })}
                 />
-              </label>
-              <label>
-                开始
-                <input
+                </Form.Item>
+                <Form.Item label="Start">
+                  <Input
                   type="time"
                   value={window.startTime}
                   onChange={(event) => updateWindow(window.id, { startTime: event.currentTarget.value })}
                 />
-              </label>
-              <label>
-                结束
-                <input
+                </Form.Item>
+                <Form.Item label="End">
+                  <Input
                   type="time"
                   value={window.endTime}
                   onChange={(event) => updateWindow(window.id, { endTime: event.currentTarget.value })}
                 />
-              </label>
-              <label>
-                间隔
-                <input
-                  type="number"
-                  min={1}
+                </Form.Item>
+                <Form.Item label="Interval">
+                  <InputNumber
+                    min={1}
+                    className="full-width-control"
                   value={window.remindIntervalMinutes}
-                  onChange={(event) =>
+                    addonAfter="min"
+                    onChange={(value) =>
                     updateWindow(window.id, {
-                      remindIntervalMinutes: Number(event.currentTarget.value),
+                        remindIntervalMinutes: Number(value),
                     })
                   }
                 />
-              </label>
-              <button type="button" className="ghost" onClick={() => removeWindow(window.id)}>
-                删除
-              </button>
-              {errors.length > 0 ? <p className="row-error">{errors.join("，")}</p> : null}
+                </Form.Item>
+                <Form.Item label="Action">
+                  <Button danger icon={<DeleteOutlined />} onClick={() => removeWindow(window.id)}>
+                    Delete
+                  </Button>
+                </Form.Item>
+              </Form>
+              {errors.length > 0 ? (
+                <Space direction="vertical">
+                  {errors.map((error) => (
+                    <Text type="danger" key={error}>
+                      {error}
+                    </Text>
+                  ))}
+                </Space>
+              ) : null}
             </div>
           );
         })}
       </div>
-    </section>
+    </Card>
   );
 }

@@ -8,14 +8,14 @@ export function setupTray(onToggleChecking: () => void, onCheckNow: () => void):
     "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAYUlEQVR4nO2XQQrAIAwE8/9/tHtaIT3bCC2pMCA3y2ZEGGKDyM4JgG9E8HYHeCXwDkYFoBI4SRWASuAkVQAqgZNUBagETlIFoBI4SRWASuAkVQAqgZNUBagETlIFoBI4+QHHWwSIamWkFgAAAABJRU5ErkJggg==",
   );
   tray = new Tray(icon);
-  tray.setToolTip("打卡提醒");
+  tray.setToolTip("Check-in Reminder");
   tray.setContextMenu(
     Menu.buildFromTemplate([
-      { label: "打开", click: showMainWindow },
-      { label: "开始/暂停检测", click: onToggleChecking },
-      { label: "立即检测", click: onCheckNow },
+      { label: "Open", click: showMainWindow },
+      { label: "Start/Pause Checks", click: onToggleChecking },
+      { label: "Check Now", click: onCheckNow },
       { type: "separator" },
-      { label: "退出", click: () => app.quit() },
+      { label: "Quit", click: () => app.quit() },
     ]),
   );
 }

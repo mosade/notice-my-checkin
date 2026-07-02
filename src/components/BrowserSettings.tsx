@@ -1,3 +1,5 @@
+import { ExperimentOutlined } from "@ant-design/icons";
+import { Alert, Button, Card, Form, Input, Space, Switch } from "antd";
 import type { AppConfig, CheckResult } from "../lib/types";
 
 type Props = {
@@ -12,42 +14,49 @@ export function BrowserSettings({ config, browserTest, onChange, onTest }: Props
     onChange({ ...config, browser: { ...config.browser, ...patch } });
 
   return (
-    <section className="panel">
-      <div className="section-title">
-        <h2>浏览器</h2>
-        <button type="button" onClick={onTest}>
-          测试浏览器
-        </button>
-      </div>
-      <label>
-        浏览器路径
-        <input
+    <Card
+      title="Browser"
+      className="settings-card"
+      extra={
+        <Button icon={<ExperimentOutlined />} onClick={onTest}>
+          Test Browser
+        </Button>
+      }
+    >
+      <Form layout="vertical">
+        <Form.Item label="Browser executable path">
+          <Input
           value={config.browser.executablePath}
           onChange={(event) => updateBrowser({ executablePath: event.currentTarget.value })}
           placeholder="C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
         />
-      </label>
-      <label>
-        用户数据目录
-        <input
+        </Form.Item>
+        <Form.Item label="User data directory">
+          <Input
           value={config.browser.userDataDir}
           onChange={(event) => updateBrowser({ userDataDir: event.currentTarget.value })}
           placeholder="browser-profile"
         />
-      </label>
-      <label className="switch-row">
-        <input
-          type="checkbox"
+        </Form.Item>
+        <Form.Item>
+          <Space align="center">
+            <Switch
           checked={config.browser.headless}
-          onChange={(event) => updateBrowser({ headless: event.currentTarget.checked })}
+              checkedChildren="On"
+              unCheckedChildren="Off"
+              onChange={(checked) => updateBrowser({ headless: checked })}
         />
-        无头模式
-      </label>
+            Headless mode
+          </Space>
+        </Form.Item>
+      </Form>
       {browserTest ? (
-        <p className={browserTest.ok ? "result ok" : "result bad"}>
-          {browserTest.ok ? "浏览器配置可用" : browserTest.error?.message ?? "浏览器配置不可用"}
-        </p>
+        <Alert
+          type={browserTest.ok ? "success" : "error"}
+          showIcon
+          message={browserTest.ok ? "Browser settings are valid." : browserTest.error?.message ?? "Browser settings are invalid."}
+        />
       ) : null}
-    </section>
+    </Card>
   );
 }

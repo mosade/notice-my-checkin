@@ -26,7 +26,7 @@ export function defaultConfig(): AppConfig {
     reminderWindows: [
       {
         id: "morning",
-        name: "上午打卡",
+        name: "Morning Check-in",
         enabled: true,
         startTime: "08:00",
         endTime: "09:00",
@@ -34,7 +34,7 @@ export function defaultConfig(): AppConfig {
       },
       {
         id: "evening",
-        name: "下午打卡",
+        name: "Evening Check-in",
         enabled: true,
         startTime: "17:30",
         endTime: "18:30",

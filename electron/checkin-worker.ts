@@ -60,7 +60,7 @@ export async function runPlaywrightPageCheck(config: AppConfig): Promise<CheckRe
         ? undefined
         : {
             code: "CHECKIN_RESPONSE_NOT_OK",
-            message: `目标接口返回 HTTP ${response.status()}`,
+            message: `Target API returned HTTP ${response.status()}`,
           },
     };
   } catch (error) {
@@ -77,15 +77,15 @@ function seconds(value: number, fallback: number): number {
 function configMessage(code: string): string {
   switch (code) {
     case "MISSING_TARGET_URL":
-      return "目标网页 URL 不能为空";
+      return "Target page URL is required";
     case "MISSING_TRIGGER_SELECTOR":
-      return "触发点击元素不能为空";
+      return "Trigger selector is required";
     case "MISSING_RESPONSE_PATTERN":
-      return "目标接口匹配规则不能为空";
+      return "Response URL pattern is required";
     case "MISSING_CHECKED_IN_KEYWORD":
-      return "已打卡判断关键词不能为空";
+      return "Checked-in keyword is required";
     default:
-      return "检测配置不完整";
+      return "Detection configuration is incomplete";
   }
 }
 
