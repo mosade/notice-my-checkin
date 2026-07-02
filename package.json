@@ -3,24 +3,32 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "main": "dist-electron/main.cjs",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
+    "dev": "concurrently -k \"npm:dev:vite\" \"npm:dev:electron\"",
+    "dev:vite": "vite --host 127.0.0.1",
+    "dev:electron": "npm run build:electron && wait-on http://127.0.0.1:5173 && cross-env ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ VITE_DEV_SERVER_URL=http://127.0.0.1:5173 electron --no-sandbox .",
+    "build": "tsc && vite build && npm run build:electron",
+    "build:electron": "tsc -p tsconfig.electron.json && node scripts/prepare-electron-build.cjs",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "test:worker": "node --test electron/*.test.mjs",
+    "postinstall": "cross-env PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ install-electron --no"
   },
   "dependencies": {
+    "@types/node": "^26.1.0",
+    "concurrently": "^10.0.3",
+    "cross-env": "^10.1.0",
+    "electron": "^43.0.0",
+    "playwright": "^1.53.2",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
-    "@tauri-apps/api": "^2",
-    "@tauri-apps/plugin-opener": "^2"
+    "wait-on": "^9.0.10"
   },
   "devDependencies": {
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
     "@vitejs/plugin-react": "^4.6.0",
     "typescript": "~5.8.3",
-    "vite": "^7.0.4",
-    "@tauri-apps/cli": "^2"
+    "vite": "^7.0.4"
   }
 }

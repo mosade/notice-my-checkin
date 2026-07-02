@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
 import "./App.css";
 import { BrowserSettings } from "./components/BrowserSettings";
 import { DetectionSettings } from "./components/DetectionSettings";
 import { ReminderWindowEditor } from "./components/ReminderWindowEditor";
 import { RuntimeStatusPanel } from "./components/RuntimeStatusPanel";
 import { validateConfig } from "./lib/config";
+import { checkinApi } from "./lib/electron";
 import type { AppConfig, AppRuntimeSnapshot, CheckResult, ReminderAction } from "./lib/types";
 
 function App() {
@@ -22,59 +21,59 @@ function MainView() {
   const validationErrors = useMemo(() => (config ? validateConfig(config) : []), [config]);
 
   const refreshSnapshot = useCallback(async () => {
-    setSnapshot(await invoke<AppRuntimeSnapshot>("get_runtime_snapshot"));
+    setSnapshot(await checkinApi.getRuntimeSnapshot());
   }, []);
 
   const start = useCallback(async () => {
-    setSnapshot(await invoke<AppRuntimeSnapshot>("start_checking"));
+    setSnapshot(await checkinApi.startChecking());
   }, []);
 
   const pause = useCallback(async () => {
-    setSnapshot(await invoke<AppRuntimeSnapshot>("pause_checking"));
+    setSnapshot(await checkinApi.pauseChecking());
   }, []);
 
   const checkNow = useCallback(async () => {
-    await invoke<ReminderAction[]>("run_check_now");
+    await checkinApi.runCheckNow();
     await refreshSnapshot();
     setMessage("已完成立即检测");
   }, [refreshSnapshot]);
 
   useEffect(() => {
-    invoke<AppConfig>("load_config").then(setConfig).catch((error) => setMessage(String(error)));
+    checkinApi.loadConfig().then(setConfig).catch((error) => setMessage(String(error)));
     refreshSnapshot().catch((error) => setMessage(String(error)));
-    const unlistenRuntime = listen<AppRuntimeSnapshot>("runtime-update", (event) => setSnapshot(event.payload));
-    const unlistenToggle = listen("tray-toggle-checking", () => {
+    const unlistenRuntime = checkinApi.onRuntimeUpdate(setSnapshot);
+    const unlistenToggle = checkinApi.onTrayToggleChecking(() => {
       if (snapshot?.checking) {
         pause().catch((error) => setMessage(String(error)));
       } else {
         start().catch((error) => setMessage(String(error)));
       }
     });
-    const unlistenCheck = listen("tray-check-now", () => {
+    const unlistenCheck = checkinApi.onTrayCheckNow(() => {
       checkNow().catch((error) => setMessage(String(error)));
     });
     return () => {
-      unlistenRuntime.then((unlisten) => unlisten());
-      unlistenToggle.then((unlisten) => unlisten());
-      unlistenCheck.then((unlisten) => unlisten());
+      unlistenRuntime();
+      unlistenToggle();
+      unlistenCheck();
     };
   }, [checkNow, pause, refreshSnapshot, snapshot?.checking, start]);
 
   if (!config) {
-    return <main className="app-shell loading">加载中</main>;
+    return <main className="app-shell loading">{message || "加载中"}</main>;
   }
 
   const save = async () => {
     if (validationErrors.length > 0) return;
-    const saved = await invoke<AppConfig>("save_config", { config });
+    const saved = await checkinApi.saveConfig(config);
     setConfig(saved);
     setMessage("配置已保存");
   };
 
   const testBrowser = async () => {
-    const saved = await invoke<AppConfig>("save_config", { config });
+    const saved = await checkinApi.saveConfig(config);
     setConfig(saved);
-    const result = await invoke<CheckResult>("test_browser");
+    const result = await checkinApi.testBrowser();
     setBrowserTest(result);
   };
 
@@ -92,7 +91,7 @@ function MainView() {
           <button type="button" onClick={checkNow}>
             立即检测
           </button>
-          <button type="button" onClick={() => invoke("test_reminder")}>
+          <button type="button" onClick={() => checkinApi.testReminder()}>
             测试提醒
           </button>
           <button type="button" disabled={validationErrors.length > 0} onClick={save}>
@@ -141,23 +140,23 @@ function ReminderView() {
   const [message, setMessage] = useState("");
 
   useEffect(() => {
-    const unlisten = listen<ReminderAction>("reminder-update", (event) => setAction(event.payload));
+    const unlisten = checkinApi.onReminderUpdate(setAction);
     return () => {
-      unlisten.then((dispose) => dispose());
+      unlisten();
     };
   }, []);
 
   const snooze = async () => {
     if (!action) return;
     setBusy(true);
-    await invoke("snooze_reminder", { windowId: action.windowId });
+    await checkinApi.snoozeReminder(action.windowId);
     setBusy(false);
   };
 
   const confirm = async () => {
     if (!action) return;
     setBusy(true);
-    const snapshot = await invoke<AppRuntimeSnapshot>("confirm_checked_in", { windowId: action.windowId });
+    const snapshot = await checkinApi.confirmCheckedIn(action.windowId);
     const current = snapshot.states.find((state) => state.reminderWindowId === action.windowId);
     setMessage(current?.status === "checked_in" ? "已确认打卡" : "暂未检测到打卡记录");
     setBusy(false);

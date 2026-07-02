@@ -3,16 +3,18 @@
   "hideToTrayOnClose": true,
   "browser": {
     "executablePath": "",
-    "headless": true,
+    "headless": false,
     "userDataDir": "browser-profile"
   },
   "detection": {
     "mode": "mock",
-    "loginUrl": "",
-    "apiUrl": "",
+    "targetUrl": "",
+    "triggerSelector": "",
+    "responseUrlPattern": "",
     "mockCheckedIn": false,
     "checkedInKeyword": "",
-    "loginTimeoutSeconds": 30
+    "loginTimeoutSeconds": 30,
+    "responseTimeoutSeconds": 15
   },
   "reminderWindows": [
     {

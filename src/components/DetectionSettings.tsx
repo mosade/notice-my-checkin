@@ -24,23 +24,31 @@ export function DetectionSettings({ config, onChange }: Props) {
           }
         >
           <option value="mock">mock</option>
-          <option value="chrome_http">chrome_http</option>
+          <option value="playwright_page">playwright_page</option>
         </select>
       </label>
       <label>
-        登录链接 A
+        目标网页 URL
         <input
-          value={config.detection.loginUrl}
-          onChange={(event) => updateDetection({ loginUrl: event.currentTarget.value })}
-          placeholder="https://example.com/login"
+          value={config.detection.targetUrl}
+          onChange={(event) => updateDetection({ targetUrl: event.currentTarget.value })}
+          placeholder="https://example.com/checkin"
         />
       </label>
       <label>
-        接口 B
+        触发点击元素
         <input
-          value={config.detection.apiUrl}
-          onChange={(event) => updateDetection({ apiUrl: event.currentTarget.value })}
-          placeholder="https://example.com/api/checkin"
+          value={config.detection.triggerSelector}
+          onChange={(event) => updateDetection({ triggerSelector: event.currentTarget.value })}
+          placeholder="button:has-text('查询')"
+        />
+      </label>
+      <label>
+        目标接口匹配
+        <input
+          value={config.detection.responseUrlPattern}
+          onChange={(event) => updateDetection({ responseUrlPattern: event.currentTarget.value })}
+          placeholder="/api/checkin/status"
         />
       </label>
       <label>
@@ -59,6 +67,17 @@ export function DetectionSettings({ config, onChange }: Props) {
           value={config.detection.loginTimeoutSeconds}
           onChange={(event) =>
             updateDetection({ loginTimeoutSeconds: Number(event.currentTarget.value) })
+          }
+        />
+      </label>
+      <label>
+        接口响应等待秒数
+        <input
+          type="number"
+          min={1}
+          value={config.detection.responseTimeoutSeconds}
+          onChange={(event) =>
+            updateDetection({ responseTimeoutSeconds: Number(event.currentTarget.value) })
           }
         />
       </label>

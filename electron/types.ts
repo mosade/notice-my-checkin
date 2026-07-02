@@ -73,3 +73,5 @@ export type CheckResult = {
     message: string;
   };
 };
+
+export type CheckOutcome = "checked_in" | "not_checked_in" | "error";
