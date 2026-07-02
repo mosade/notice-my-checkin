@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync } from "node:fs";
-import { BrowserWindow, app, ipcMain } from "electron";
+import { BrowserWindow, app, ipcMain, powerMonitor } from "electron";
 import { readOrCreateConfig, writeConfig } from "./config.js";
 import { Scheduler } from "./scheduler.js";
 import { setupTray } from "./tray.js";
@@ -12,7 +12,11 @@ app.commandLine.appendSwitch("no-sandbox");
 
 let scheduler: Scheduler;
 let checkingTimer: NodeJS.Timeout | undefined;
+let checkingEnabled = false;
+let dueChecksInProgress = false;
 let activeReminderWindowId: string | undefined;
+
+const MAX_TIMEOUT_DELAY = 2_147_483_647;
 
 app.whenReady().then(async () => {
   ensureUserDataDir();
@@ -27,6 +31,10 @@ app.whenReady().then(async () => {
   } catch (error) {
     console.warn("Tray setup failed:", error);
   }
+  powerMonitor.on("resume", () => {
+    scheduleNextCheck();
+    emitRuntime();
+  });
   if (config.autoStartChecking) startSchedulerLoop();
 });
 
@@ -39,6 +47,7 @@ function registerIpc(): void {
   ipcMain.handle("config:save", async (_event, config: AppConfig) => {
     await writeConfig(config);
     scheduler.replaceConfig(config);
+    scheduleNextCheck();
     emitRuntime();
     return config;
   });
@@ -58,6 +67,7 @@ function registerIpc(): void {
     scheduler.snooze(windowId, nowParts().time);
     activeReminderWindowId = undefined;
     hideReminderWindow();
+    scheduleNextCheck();
     emitRuntime();
     return runtimeSnapshot();
   });
@@ -66,38 +76,65 @@ function registerIpc(): void {
     const { date, time } = nowParts();
     const action = scheduler.applyCheckResult(windowId, date, time, outcomeFrom(result), result.error?.message);
     handleAction(windowId, action);
+    scheduleNextCheck();
     emitRuntime();
     return runtimeSnapshot();
   });
 }
 
 function startSchedulerLoop(): void {
-  if (checkingTimer) return;
-  checkingTimer = setInterval(() => {
-    void runDueChecks();
-  }, 30_000);
-  void runDueChecks();
+  if (checkingEnabled) return;
+  checkingEnabled = true;
+  scheduleNextCheck();
+  emitRuntime();
 }
 
 function stopSchedulerLoop(): void {
-  if (!checkingTimer) return;
-  clearInterval(checkingTimer);
-  checkingTimer = undefined;
+  if (!checkingEnabled && !checkingTimer) return;
+  checkingEnabled = false;
+  clearCurrentTimer();
   emitRuntime();
 }
 
+function scheduleNextCheck(): void {
+  clearCurrentTimer();
+  if (!checkingEnabled) return;
+
+  const nextAt = scheduler.nextDueAt(nowParts());
+  if (!nextAt) return;
+
+  checkingTimer = setTimeout(() => {
+    checkingTimer = undefined;
+    void runDueChecks()
+      .catch((error) => console.error("Scheduled check failed:", error))
+      .finally(scheduleNextCheck);
+  }, delayUntil(nextAt));
+}
+
+function clearCurrentTimer(): void {
+  if (!checkingTimer) return;
+  clearTimeout(checkingTimer);
+  checkingTimer = undefined;
+}
+
 async function runDueChecks(): Promise<ReminderAction[]> {
-  const { date, time } = nowParts();
-  const due = scheduler.dueWindows(date, time);
-  const actions: ReminderAction[] = [];
-  for (const window of due) {
-    const result = await runCheck(scheduler.getConfig());
-    const action = scheduler.applyCheckResult(window.id, date, time, outcomeFrom(result), result.error?.message);
-    handleAction(window.id, action);
-    if (action) actions.push(action);
+  if (dueChecksInProgress) return [];
+  dueChecksInProgress = true;
+  try {
+    const { date, time } = nowParts();
+    const due = scheduler.dueWindows(date, time);
+    const actions: ReminderAction[] = [];
+    for (const window of due) {
+      const result = await runCheck(scheduler.getConfig());
+      const action = scheduler.applyCheckResult(window.id, date, time, outcomeFrom(result), result.error?.message);
+      handleAction(window.id, action);
+      if (action) actions.push(action);
+    }
+    emitRuntime();
+    return actions;
+  } finally {
+    dueChecksInProgress = false;
   }
-  emitRuntime();
-  return actions;
 }
 
 async function runCheckNow(): Promise<ReminderAction[]> {
@@ -111,6 +148,7 @@ async function runCheckNow(): Promise<ReminderAction[]> {
     handleAction(window.id, action);
     if (action) actions.push(action);
   }
+  scheduleNextCheck();
   emitRuntime();
   return actions;
 }
@@ -155,7 +193,7 @@ function handleAction(windowId: string, action: ReminderAction | undefined): voi
 
 function runtimeSnapshot(): AppRuntimeSnapshot {
   return {
-    checking: Boolean(checkingTimer),
+    checking: checkingEnabled,
     states: scheduler.runtimeStates(),
   };
 }
@@ -186,6 +224,7 @@ function wireWindowCloseHandlers(): void {
     if (activeReminderWindowId) {
       scheduler.snooze(activeReminderWindowId, nowParts().time);
       activeReminderWindowId = undefined;
+      scheduleNextCheck();
     }
     reminderWindow.hide();
     emitRuntime();
@@ -193,7 +232,7 @@ function wireWindowCloseHandlers(): void {
 }
 
 function toggleCheckingFromTray(): void {
-  if (checkingTimer) stopSchedulerLoop();
+  if (checkingEnabled) stopSchedulerLoop();
   else startSchedulerLoop();
   BrowserWindow.getAllWindows().forEach((window) => window.webContents.send("tray:toggle-checking"));
 }
@@ -205,4 +244,8 @@ function checkNowFromTray(): void {
 
 function ensureUserDataDir(): void {
   mkdirSync("browser-profile", { recursive: true });
+}
+
+function delayUntil(target: Date): number {
+  return Math.min(Math.max(0, target.getTime() - Date.now()), MAX_TIMEOUT_DELAY);
 }

@@ -11,7 +11,7 @@
     "build": "tsc && vite build && npm run build:electron",
     "build:electron": "tsc -p tsconfig.electron.json && node scripts/prepare-electron-build.cjs",
     "preview": "vite preview",
-    "test:worker": "node --test electron/*.test.mjs",
+    "test:worker": "npm run build:electron && node --test electron/*.test.mjs",
     "postinstall": "cross-env PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ install-electron --no"
   },
   "dependencies": {

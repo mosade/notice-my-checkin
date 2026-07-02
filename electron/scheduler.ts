@@ -1,5 +1,12 @@
-import { addMinutes, isAtOrAfter, timeInWindow } from "./time.js";
+import { addMinutes, isAtOrAfter, minutesFromTime, timeInWindow } from "./time.js";
 import type { AppConfig, CheckOutcome, ReminderAction, ReminderWindow, RuntimeWindowState } from "./types.js";
+
+type TimeParts = {
+  date: string;
+  time: string;
+};
+
+const DAY_MINUTES = 24 * 60;
 
 export class Scheduler {
   private config: AppConfig;
@@ -26,6 +33,32 @@ export class Scheduler {
     return [...this.states.values()].sort((left, right) =>
       left.reminderWindowId.localeCompare(right.reminderWindowId),
     );
+  }
+
+  nextDueAt(current: TimeParts): Date | undefined {
+    const currentMinute = minutesFromTime(current.time);
+    if (currentMinute === null) return undefined;
+
+    let next: Date | undefined;
+    for (const window of this.config.reminderWindows) {
+      if (!window.enabled) continue;
+
+      const start = minutesFromTime(window.startTime);
+      const end = minutesFromTime(window.endTime);
+      if (start === null || end === null || start >= end) continue;
+
+      this.ensureState(window, current.date);
+      this.expireIfNeeded(window, current.time);
+
+      const dueMinute = this.nextDueMinute(window, currentMinute, start, end);
+      if (dueMinute === undefined) continue;
+
+      const dueAt = dateAtMinute(current.date, dueMinute);
+      if (!dueAt) continue;
+      if (!next || dueAt < next) next = dueAt;
+    }
+
+    return next;
   }
 
   dueWindows(date: string, currentTime: string): ReminderWindow[] {
@@ -115,6 +148,25 @@ export class Scheduler {
     }
     return false;
   }
+
+  private nextDueMinute(window: ReminderWindow, currentMinute: number, start: number, end: number): number | undefined {
+    if (currentMinute < start) return start;
+    if (currentMinute >= end) return DAY_MINUTES + start;
+
+    const state = this.states.get(window.id);
+    if (!state) return currentMinute;
+
+    if (state.status === "idle" || state.status === "not_checked_in" || state.status === "error") {
+      if (!state.nextReminderAt) return currentMinute;
+
+      const nextReminderMinute = minutesFromTime(state.nextReminderAt);
+      if (nextReminderMinute === null) return currentMinute;
+      if (nextReminderMinute >= end) return DAY_MINUTES + start;
+      return Math.max(currentMinute, nextReminderMinute);
+    }
+
+    return DAY_MINUTES + start;
+  }
 }
 
 function actionFrom(window: ReminderWindow, state: RuntimeWindowState, error?: string): ReminderAction {
@@ -126,4 +178,14 @@ function actionFrom(window: ReminderWindow, state: RuntimeWindowState, error?: s
     error,
     showReminder: true,
   };
+}
+
+function dateAtMinute(date: string, minute: number): Date | undefined {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
+  if (!match) return undefined;
+
+  const [, year, month, day] = match;
+  const value = new Date(Number(year), Number(month) - 1, Number(day), 0, minute, 0, 0);
+  if (Number.isNaN(value.getTime())) return undefined;
+  return value;
 }
