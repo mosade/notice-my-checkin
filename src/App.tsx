@@ -31,6 +31,7 @@ function MainView() {
   const [snapshot, setSnapshot] = useState<AppRuntimeSnapshot>();
   const [browserTest, setBrowserTest] = useState<CheckResult>();
   const [message, setMessage] = useState("");
+  const [checkNowBusy, setCheckNowBusy] = useState(false);
   const validationErrors = useMemo(() => (config ? validateConfig(config) : []), [config]);
 
   const refreshSnapshot = useCallback(async () => {
@@ -46,9 +47,23 @@ function MainView() {
   }, []);
 
   const checkNow = useCallback(async () => {
-    await checkinApi.runCheckNow();
-    await refreshSnapshot();
-    setMessage("Manual check completed.");
+    setCheckNowBusy(true);
+    try {
+      const result = await checkinApi.runCheckNow();
+      await refreshSnapshot();
+      const checkedAt = new Date().toLocaleTimeString();
+      if (result.check.ok) {
+        setMessage(
+          result.check.checkedIn
+            ? `Manual check completed at ${checkedAt}. Check-in was found.`
+            : `Manual check completed at ${checkedAt}. No check-in record was found.`,
+        );
+      } else {
+        setMessage(`Manual check failed at ${checkedAt}: ${result.check.error?.message ?? "Unknown error"}`);
+      }
+    } finally {
+      setCheckNowBusy(false);
+    }
   }, [refreshSnapshot]);
 
   useEffect(() => {
@@ -109,7 +124,7 @@ function MainView() {
           >
             {snapshot?.checking ? "Pause Checks" : "Start Checks"}
           </Button>
-          <Button icon={<SyncOutlined />} onClick={checkNow}>
+          <Button icon={<SyncOutlined />} loading={checkNowBusy} onClick={checkNow}>
             Check Now
           </Button>
           <Button icon={<BellOutlined />} onClick={() => checkinApi.testReminder()}>
@@ -166,10 +181,16 @@ function ReminderView() {
 
   useEffect(() => {
     const unlisten = checkinApi.onReminderUpdate(setAction);
+    checkinApi.reminderReady().catch((error) => setMessage(String(error)));
     return () => {
       unlisten();
     };
   }, []);
+
+  useEffect(() => {
+    if (!action) return;
+    checkinApi.reminderDisplayReady().catch((error) => setMessage(String(error)));
+  }, [action]);
 
   const snooze = async () => {
     if (!action) return;
@@ -187,13 +208,15 @@ function ReminderView() {
     setBusy(false);
   };
 
+  if (!action) return null;
+
   return (
     <Layout className="reminder-shell">
       <Card size="small" className="reminder-card">
         <Space direction="vertical" size={8}>
           <Title level={4}>{action?.error ? "Check Failed" : "No Check-in Record Found"}</Title>
           <Text className="reminder-window-name">
-            {action ? `${action.windowName} ${action.timeRange}` : "Waiting for reminder data"}
+            {`${action.windowName} ${action.timeRange}`}
           </Text>
           <Alert
             type={action?.error ? "error" : "info"}

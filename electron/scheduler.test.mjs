@@ -76,3 +76,32 @@ test("moves to tomorrow's first enabled window after today's windows are done", 
 
   assert.equal(localIso(next), "2026-07-03T14:00");
 });
+
+test("does not create a reminder action outside the configured window", () => {
+  const scheduler = new Scheduler(createConfig([enabledWindow()]));
+
+  const action = scheduler.applyCheckResult("morning", "2026-07-02", "10:30", "not_checked_in");
+
+  assert.equal(action, undefined);
+});
+
+test("returns active windows inside the configured window even when they are not due", () => {
+  const scheduler = new Scheduler(createConfig([enabledWindow()]));
+  scheduler.applyCheckResult("morning", "2026-07-02", "09:05", "not_checked_in");
+  scheduler.snooze("morning", "09:05");
+
+  const active = scheduler.activeWindows("2026-07-02", "09:06");
+
+  assert.deepEqual(
+    active.map((window) => window.id),
+    ["morning"],
+  );
+});
+
+test("does not return active windows outside the configured window", () => {
+  const scheduler = new Scheduler(createConfig([enabledWindow()]));
+
+  const active = scheduler.activeWindows("2026-07-02", "10:30");
+
+  assert.deepEqual(active, []);
+});

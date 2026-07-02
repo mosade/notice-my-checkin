@@ -58,3 +58,65 @@ test("reminder popup uses a compact non-scrolling layout", async () => {
   assert.match(cssSource, /\.reminder-shell\s*\{[^}]*overflow: hidden;/s);
   assert.doesNotMatch(cssSource, /\.reminder-shell\s*\{[^}]*min-height: 100vh;/s);
 });
+
+test("reminder window is created lazily after an action exists", async () => {
+  const mainSource = await readFile("electron/main.ts", "utf8");
+  const readyBlock = mainSource.match(/app\.whenReady\(\)\.then\(async \(\) => \{(?<body>[\s\S]*?)\n\}\);/);
+
+  assert.ok(readyBlock?.groups?.body);
+  assert.doesNotMatch(readyBlock.groups.body, /ensureReminderWindow\(/);
+  assert.match(mainSource, /showReminderWindow\(action\);/);
+});
+
+test("reminder action is sent only after the reminder page is ready", async () => {
+  const [windowsSource, mainSource, preloadSource, appSource] = await Promise.all([
+    readFile("electron/windows.ts", "utf8"),
+    readFile("electron/main.ts", "utf8"),
+    readFile("electron/preload.ts", "utf8"),
+    readFile("src/App.tsx", "utf8"),
+  ]);
+  const showReminderWindow = windowsSource.match(/export function showReminderWindow[\s\S]*?\n\}/)?.[0] ?? "";
+
+  assert.match(windowsSource, /let reminderWindowReadyResolve: \(\(\) => void\) \| undefined;/);
+  assert.match(showReminderWindow, /reminderWindowReady/);
+  assert.match(showReminderWindow, /webContents\.send\("reminder:update", action\)/);
+  assert.doesNotMatch(showReminderWindow, /window\.show\(\)/);
+  assert.doesNotMatch(showReminderWindow, /const window = ensureReminderWindow\(\);\s*window\.webContents\.send/s);
+  assert.match(mainSource, /ipcMain\.handle\("reminder:ready"/);
+  assert.match(preloadSource, /reminderReady: \(\) => ipcRenderer\.invoke\("reminder:ready"\)/);
+  assert.match(appSource, /checkinApi\.reminderReady\(\)/);
+});
+
+test("reminder window is shown only after the renderer has rendered action data", async () => {
+  const [mainSource, preloadSource, appSource, viteEnvSource, electronFallbackSource, windowsSource] = await Promise.all([
+    readFile("electron/main.ts", "utf8"),
+    readFile("electron/preload.ts", "utf8"),
+    readFile("src/App.tsx", "utf8"),
+    readFile("src/vite-env.d.ts", "utf8"),
+    readFile("src/lib/electron.ts", "utf8"),
+    readFile("electron/windows.ts", "utf8"),
+  ]);
+  const showReminderWindow = windowsSource.match(/export function showReminderWindow[\s\S]*?\n\}/)?.[0] ?? "";
+
+  assert.doesNotMatch(showReminderWindow, /window\.show\(\)/);
+  assert.match(windowsSource, /export function displayReminderWindow\(\): void/);
+  assert.match(mainSource, /ipcMain\.handle\("reminder:display-ready"/);
+  assert.match(preloadSource, /reminderDisplayReady: \(\) => ipcRenderer\.invoke\("reminder:display-ready"\)/);
+  assert.match(viteEnvSource, /reminderDisplayReady: \(\) => Promise<void>;/);
+  assert.match(electronFallbackSource, /reminderDisplayReady: \(\) => unavailable<void>\("reminderDisplayReady"\)/);
+  assert.match(appSource, /checkinApi\.reminderDisplayReady\(\)/);
+  assert.match(appSource, /if \(!action\) return null;/);
+  assert.doesNotMatch(appSource, /Waiting for reminder data/);
+});
+
+test("Check Now reports the immediate detection result", async () => {
+  const appSource = await readFile("src/App.tsx", "utf8");
+
+  assert.match(appSource, /const \[checkNowBusy, setCheckNowBusy\] = useState\(false\);/);
+  assert.match(appSource, /const result = await checkinApi\.runCheckNow\(\);/);
+  assert.match(appSource, /result\.check\.ok/);
+  assert.match(appSource, /Manual check completed/);
+  assert.match(appSource, /Manual check failed/);
+  assert.doesNotMatch(appSource, /No reminder window is active right now/);
+  assert.match(appSource, /loading=\{checkNowBusy\}/);
+});

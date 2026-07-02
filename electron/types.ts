@@ -74,4 +74,10 @@ export type CheckResult = {
   };
 };
 
+export type ManualCheckResult = {
+  check: CheckResult;
+  checkedWindowCount: number;
+  actions: ReminderAction[];
+};
+
 export type CheckOutcome = "checked_in" | "not_checked_in" | "error";

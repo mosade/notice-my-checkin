@@ -73,3 +73,9 @@ export type CheckResult = {
     message: string;
   };
 };
+
+export type ManualCheckResult = {
+  check: CheckResult;
+  checkedWindowCount: number;
+  actions: ReminderAction[];
+};

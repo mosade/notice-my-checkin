@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from "electron";
-import type { AppConfig, AppRuntimeSnapshot, CheckResult, ReminderAction } from "./types.js";
+import type { AppConfig, AppRuntimeSnapshot, CheckResult, ManualCheckResult, ReminderAction } from "./types.js";
 
 function subscribe<T>(channel: string, callback: (value: T) => void): () => void {
   const listener = (_event: Electron.IpcRendererEvent, value: T) => callback(value);
@@ -13,9 +13,11 @@ contextBridge.exposeInMainWorld("checkinApi", {
   getRuntimeSnapshot: () => ipcRenderer.invoke("runtime:snapshot") as Promise<AppRuntimeSnapshot>,
   startChecking: () => ipcRenderer.invoke("checking:start") as Promise<AppRuntimeSnapshot>,
   pauseChecking: () => ipcRenderer.invoke("checking:pause") as Promise<AppRuntimeSnapshot>,
-  runCheckNow: () => ipcRenderer.invoke("checking:run-now") as Promise<ReminderAction[]>,
+  runCheckNow: () => ipcRenderer.invoke("checking:run-now") as Promise<ManualCheckResult>,
   testBrowser: () => ipcRenderer.invoke("browser:test") as Promise<CheckResult>,
   testReminder: () => ipcRenderer.invoke("reminder:test") as Promise<void>,
+  reminderReady: () => ipcRenderer.invoke("reminder:ready") as Promise<void>,
+  reminderDisplayReady: () => ipcRenderer.invoke("reminder:display-ready") as Promise<void>,
   snoozeReminder: (windowId: string) =>
     ipcRenderer.invoke("reminder:snooze", windowId) as Promise<AppRuntimeSnapshot>,
   confirmCheckedIn: (windowId: string) =>

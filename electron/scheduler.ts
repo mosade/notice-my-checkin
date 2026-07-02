@@ -76,6 +76,19 @@ export class Scheduler {
     return due;
   }
 
+  activeWindows(date: string, currentTime: string): ReminderWindow[] {
+    const active: ReminderWindow[] = [];
+    for (const window of this.config.reminderWindows) {
+      if (!window.enabled) continue;
+      this.ensureState(window, date);
+      this.expireIfNeeded(window, currentTime);
+      if (timeInWindow(currentTime, window.startTime, window.endTime)) {
+        active.push(window);
+      }
+    }
+    return active;
+  }
+
   applyCheckResult(
     windowId: string,
     date: string,
@@ -90,6 +103,11 @@ export class Scheduler {
     if (!state) return undefined;
 
     state.lastCheckedAt = currentTime;
+    if (!timeInWindow(currentTime, window.startTime, window.endTime)) {
+      this.expireIfNeeded(window, currentTime);
+      return undefined;
+    }
+
     if (outcome === "checked_in") {
       state.status = "checked_in";
       state.nextReminderAt = undefined;

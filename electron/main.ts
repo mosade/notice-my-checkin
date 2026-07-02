@@ -3,9 +3,17 @@ import { BrowserWindow, app, ipcMain, powerMonitor } from "electron";
 import { readOrCreateConfig, writeConfig } from "./config.js";
 import { Scheduler } from "./scheduler.js";
 import { setupTray } from "./tray.js";
-import type { AppConfig, AppRuntimeSnapshot, CheckOutcome, ReminderAction } from "./types.js";
+import type { AppConfig, AppRuntimeSnapshot, CheckOutcome, ManualCheckResult, ReminderAction } from "./types.js";
 import { nowParts } from "./time.js";
-import { hideReminderWindow, createMainWindow, ensureReminderWindow, getMainWindow, getReminderWindow, showReminderWindow } from "./windows.js";
+import {
+  hideReminderWindow,
+  createMainWindow,
+  displayReminderWindow,
+  getMainWindow,
+  getReminderWindow,
+  markReminderWindowReady,
+  showReminderWindow,
+} from "./windows.js";
 import { runCheck } from "./checkin-worker.js";
 
 app.commandLine.appendSwitch("no-sandbox");
@@ -15,6 +23,7 @@ let checkingTimer: NodeJS.Timeout | undefined;
 let checkingEnabled = false;
 let dueChecksInProgress = false;
 let activeReminderWindowId: string | undefined;
+let reminderCloseHandlerWired = false;
 
 const MAX_TIMEOUT_DELAY = 2_147_483_647;
 
@@ -24,8 +33,7 @@ app.whenReady().then(async () => {
   scheduler = new Scheduler(config);
   registerIpc();
   createMainWindow();
-  ensureReminderWindow();
-  wireWindowCloseHandlers();
+  wireMainWindowCloseHandler();
   try {
     setupTray(toggleCheckingFromTray, checkNowFromTray);
   } catch (error) {
@@ -63,6 +71,8 @@ function registerIpc(): void {
   ipcMain.handle("checking:run-now", () => runCheckNow());
   ipcMain.handle("browser:test", () => testBrowser());
   ipcMain.handle("reminder:test", () => testReminder());
+  ipcMain.handle("reminder:ready", () => markReminderWindowReady());
+  ipcMain.handle("reminder:display-ready", () => displayReminderWindow());
   ipcMain.handle("reminder:snooze", (_event, windowId: string) => {
     scheduler.snooze(windowId, nowParts().time);
     activeReminderWindowId = undefined;
@@ -137,34 +147,39 @@ async function runDueChecks(): Promise<ReminderAction[]> {
   }
 }
 
-async function runCheckNow(): Promise<ReminderAction[]> {
+async function runCheckNow(): Promise<ManualCheckResult> {
   const { date, time } = nowParts();
-  const due = scheduler.dueWindows(date, time);
-  const windows = due.length > 0 ? due : scheduler.getConfig().reminderWindows.filter((window) => window.enabled);
+  const result = await runCheck(scheduler.getConfig());
   const actions: ReminderAction[] = [];
+  const windows = scheduler.activeWindows(date, time);
   for (const window of windows) {
-    const result = await runCheck(scheduler.getConfig());
     const action = scheduler.applyCheckResult(window.id, date, time, outcomeFrom(result), result.error?.message);
     handleAction(window.id, action);
     if (action) actions.push(action);
   }
   scheduleNextCheck();
   emitRuntime();
-  return actions;
+  return {
+    check: result,
+    checkedWindowCount: windows.length,
+    actions,
+  };
 }
 
 function testReminder(): void {
+  const { time } = nowParts();
   const window = scheduler.getConfig().reminderWindows.find((item) => item.enabled);
   if (!window) throw new Error("No enabled reminder window");
   const action: ReminderAction = {
     windowId: window.id,
     windowName: window.name,
     timeRange: `${window.startTime}-${window.endTime}`,
-    lastCheckedAt: nowParts().time,
+    lastCheckedAt: time,
     showReminder: true,
   };
   activeReminderWindowId = window.id;
   showReminderWindow(action);
+  wireReminderWindowCloseHandler();
 }
 
 function testBrowser() {
@@ -185,6 +200,7 @@ function handleAction(windowId: string, action: ReminderAction | undefined): voi
   if (action) {
     activeReminderWindowId = action.windowId;
     showReminderWindow(action);
+    wireReminderWindowCloseHandler();
   } else if (activeReminderWindowId === windowId) {
     activeReminderWindowId = undefined;
     hideReminderWindow();
@@ -209,7 +225,7 @@ function outcomeFrom(result: { ok: boolean; checkedIn: boolean }): CheckOutcome 
   return "error";
 }
 
-function wireWindowCloseHandlers(): void {
+function wireMainWindowCloseHandler(): void {
   const mainWindow = getMainWindow();
   mainWindow?.on("close", (event) => {
     if (scheduler.getConfig().hideToTrayOnClose) {
@@ -217,9 +233,17 @@ function wireWindowCloseHandlers(): void {
       mainWindow.hide();
     }
   });
+}
 
+function wireReminderWindowCloseHandler(): void {
+  if (reminderCloseHandlerWired) return;
   const reminderWindow = getReminderWindow();
-  reminderWindow?.on("close", (event) => {
+  if (!reminderWindow) return;
+  reminderCloseHandlerWired = true;
+  reminderWindow.on("closed", () => {
+    reminderCloseHandlerWired = false;
+  });
+  reminderWindow.on("close", (event) => {
     event.preventDefault();
     if (activeReminderWindowId) {
       scheduler.snooze(activeReminderWindowId, nowParts().time);

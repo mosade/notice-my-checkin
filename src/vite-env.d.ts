@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
 
-import type { AppConfig, AppRuntimeSnapshot, CheckResult, ReminderAction } from "./lib/types";
+import type { AppConfig, AppRuntimeSnapshot, CheckResult, ManualCheckResult, ReminderAction } from "./lib/types";
 
 export {};
 
@@ -12,9 +12,11 @@ declare global {
       getRuntimeSnapshot: () => Promise<AppRuntimeSnapshot>;
       startChecking: () => Promise<AppRuntimeSnapshot>;
       pauseChecking: () => Promise<AppRuntimeSnapshot>;
-      runCheckNow: () => Promise<ReminderAction[]>;
+      runCheckNow: () => Promise<ManualCheckResult>;
       testBrowser: () => Promise<CheckResult>;
       testReminder: () => Promise<void>;
+      reminderReady: () => Promise<void>;
+      reminderDisplayReady: () => Promise<void>;
       snoozeReminder: (windowId: string) => Promise<AppRuntimeSnapshot>;
       confirmCheckedIn: (windowId: string) => Promise<AppRuntimeSnapshot>;
       onRuntimeUpdate: (callback: (snapshot: AppRuntimeSnapshot) => void) => () => void;

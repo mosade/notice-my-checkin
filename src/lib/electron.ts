@@ -1,4 +1,4 @@
-import type { AppConfig, AppRuntimeSnapshot, CheckResult, ReminderAction } from "./types";
+import type { AppConfig, AppRuntimeSnapshot, CheckResult, ManualCheckResult } from "./types";
 
 function unavailable<T>(name: string): Promise<T> {
   return Promise.reject(new Error(`Electron API is not available: ${name}`));
@@ -10,9 +10,11 @@ export const checkinApi = window.checkinApi ?? {
   getRuntimeSnapshot: () => unavailable<AppRuntimeSnapshot>("getRuntimeSnapshot"),
   startChecking: () => unavailable<AppRuntimeSnapshot>("startChecking"),
   pauseChecking: () => unavailable<AppRuntimeSnapshot>("pauseChecking"),
-  runCheckNow: () => unavailable<ReminderAction[]>("runCheckNow"),
+  runCheckNow: () => unavailable<ManualCheckResult>("runCheckNow"),
   testBrowser: () => unavailable<CheckResult>("testBrowser"),
   testReminder: () => unavailable<void>("testReminder"),
+  reminderReady: () => unavailable<void>("reminderReady"),
+  reminderDisplayReady: () => unavailable<void>("reminderDisplayReady"),
   snoozeReminder: () => unavailable<AppRuntimeSnapshot>("snoozeReminder"),
   confirmCheckedIn: () => unavailable<AppRuntimeSnapshot>("confirmCheckedIn"),
   onRuntimeUpdate: () => () => undefined,

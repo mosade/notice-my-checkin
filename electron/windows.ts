@@ -4,6 +4,8 @@ import type { ReminderAction } from "./types.js";
 
 let mainWindow: BrowserWindow | undefined;
 let reminderWindow: BrowserWindow | undefined;
+let reminderWindowReadyResolve: (() => void) | undefined;
+let reminderWindowReady: Promise<void> | undefined;
 
 export function createMainWindow(): BrowserWindow {
   mainWindow = new BrowserWindow({
@@ -17,7 +19,7 @@ export function createMainWindow(): BrowserWindow {
       nodeIntegration: false,
     },
   });
-  loadRenderer(mainWindow);
+  void loadRenderer(mainWindow).catch((error) => console.error("Main window load failed:", error));
   return mainWindow;
 }
 
@@ -45,16 +47,37 @@ export function ensureReminderWindow(): BrowserWindow {
       nodeIntegration: false,
     },
   });
-  loadRenderer(reminderWindow, "#/reminder");
+  reminderWindow.on("closed", () => {
+    reminderWindow = undefined;
+    reminderWindowReadyResolve = undefined;
+    reminderWindowReady = undefined;
+  });
+  reminderWindowReady = new Promise((resolve) => {
+    reminderWindowReadyResolve = resolve;
+  });
+  void loadRenderer(reminderWindow, "#/reminder").catch((error) => {
+    console.error("Reminder window load failed:", error);
+  });
   return reminderWindow;
+}
+
+export function markReminderWindowReady(): void {
+  reminderWindowReadyResolve?.();
 }
 
 export function showReminderWindow(action: ReminderAction): void {
   const window = ensureReminderWindow();
-  window.webContents.send("reminder:update", action);
-  window.show();
-  window.setAlwaysOnTop(true);
-  window.focus();
+  void reminderWindowReady?.then(() => {
+    if (window.isDestroyed()) return;
+    window.webContents.send("reminder:update", action);
+  });
+}
+
+export function displayReminderWindow(): void {
+  if (!reminderWindow || reminderWindow.isDestroyed()) return;
+  reminderWindow.show();
+  reminderWindow.setAlwaysOnTop(true);
+  reminderWindow.focus();
 }
 
 export function hideReminderWindow(): void {
@@ -67,11 +90,10 @@ export function getReminderWindow(): BrowserWindow | undefined {
   return reminderWindow;
 }
 
-function loadRenderer(window: BrowserWindow, hash = ""): void {
+function loadRenderer(window: BrowserWindow, hash = ""): Promise<void> {
   const devUrl = process.env.VITE_DEV_SERVER_URL;
   if (devUrl) {
-    void window.loadURL(`${devUrl}${hash}`);
-    return;
+    return window.loadURL(`${devUrl}${hash}`);
   }
-  void window.loadFile(path.join(app.getAppPath(), "dist", "index.html"), { hash: hash.replace(/^#/, "") });
+  return window.loadFile(path.join(app.getAppPath(), "dist", "index.html"), { hash: hash.replace(/^#/, "") });
 }
